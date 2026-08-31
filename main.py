@@ -1,10 +1,12 @@
 import customtkinter as ctk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # Set the apperance mode of the application
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
-class counter_app(ctk.CTk):
+class live_counter_gui(ctk.CTk):
     def __init__(self):
         super().__init__()
 
@@ -17,21 +19,21 @@ class counter_app(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
 
         # Create a frame for the configuration options on the left side of the window
-        self.config_frame = ctk.CTkFrame(self, width=180, fg_color = 'gray')
+        self.config_frame = ctk.CTkFrame(self, width=180)
         self.config_frame.grid(row=0, column=0, rowspan=2, padx=(10, 0), pady=10, sticky="nsew")
         self.config_frame.pack_propagate(False)
 
         # Create a frame for the buttons on the right side
-        self.button_frame = ctk.CTkFrame(self, width=420, height=55, fg_color = 'gray')
+        self.button_frame = ctk.CTkFrame(self, width=420, height=55)
         self.button_frame.grid(row=0, column=1, padx=10, pady=(10, 0), sticky="nsew")
 
         # Create a frame for the graph on the right side
-        self.graph_frame = ctk.CTkFrame(self, width=420, height=545, fg_color = 'gray')
+        self.graph_frame = ctk.CTkFrame(self, width=420, height=545)
         self.graph_frame.grid(row=1, column=1, padx=10, pady=(10,10), sticky="nsew")
 
         self.create_config_widgets()
-
-
+        self.create_button_widgets()
+        self.create_graph()
 
     def create_config_widgets(self):
 
@@ -70,14 +72,35 @@ class counter_app(ctk.CTk):
         self.checkbox_time_trend = ctk.CTkCheckBox(self.config_frame,
                                                     text=f"Continuous \n Time Trend",
                                                     font=ctk.CTkFont(size=12, weight="bold"))
-        self.checkbox_time_trend.grid(pady=(0, 20), padx=20, sticky="w")
+        self.checkbox_time_trend.pack(pady=(0, 20), padx=20)
 
         self.button_save = ctk.CTkButton(self.config_frame, text="Save", font=ctk.CTkFont(size=12, weight="bold"))
         self.button_save.pack(pady=(0, 20), padx=20, side="bottom")
 
+    def create_button_widgets(self):
+        buttons_symbols = ["▶", "⏸", "↶", "↓"]
+        button_width = 30
+        button_height = 30
+
+        for i, symbol in enumerate(buttons_symbols):
+            button = ctk.CTkButton(self.button_frame, text=symbol, width=button_width, height=button_height,
+                                   font=ctk.CTkFont(size=20, weight="bold"))
+            button.grid(row=0, column=i, padx=(10 if i == 0 else 5, 10), pady=5)
+
+    def create_graph(self):
+        # Create a matplotlib figure and axis
+        plt.style.use('dark_background')
+        self.fig, self.ax = plt.subplots(figsize=(5, 4))
+        self.ax.set_xlabel("Elapsed time (s)", labelpad=10)
+        self.ax.set_ylabel("Count-related value", labelpad=20)
+        self.ax.grid(True)
+
+        # Create a FigureCanvasTkAgg object to embed the matplotlib figure in the Tkinter window
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
+        self.canvas.draw()
+        self.canvas.get_tk_widget().pack(fill="both", expand=True)
 
 
 
-
-root = counter_app()
+root = live_counter_gui()
 root.mainloop()
