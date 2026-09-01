@@ -1,4 +1,5 @@
 import customtkinter as ctk
+import time
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from tkinter import messagebox
@@ -26,7 +27,7 @@ class live_counter_gui(ctk.CTk):
         self.input_channel = None
         self.continuous_time_trend = None
         self.tfa = None
-        self.running_graph = False
+        self.running_graph = True
 
         # Create a frame for the configuration options on the left side of the window
         self.config_frame = ctk.CTkFrame(self, width=180)
@@ -89,8 +90,12 @@ class live_counter_gui(ctk.CTk):
                                                     font=ctk.CTkFont(size=12, weight="bold"))
         self.checkbox_time_trend.pack(pady=(0, 20), padx=20)
 
-        self.button_save = ctk.CTkButton(self.config_frame, text="Connect", font=ctk.CTkFont(size=12, weight="bold"), command=self.get_config_info)
-        self.button_save.pack(pady=(0, 20), padx=20, side="bottom")
+        self.button_connect = ctk.CTkButton(self.config_frame, text="Connect", font=ctk.CTkFont(size=12, weight="bold"), command=self.get_config_info)
+        self.button_disconnect = ctk.CTkButton(self.config_frame, text="Disconnect", font=ctk.CTkFont(size=12, weight="bold"), command=self.disconnect_from_moku)
+
+        self.button_disconnect.pack(pady=(0, 20), padx=20, side="bottom")
+        self.button_connect.pack(pady=(0, 20), padx=20, side="bottom")
+
 
     def create_button_widgets(self):
 
@@ -98,9 +103,9 @@ class live_counter_gui(ctk.CTk):
         button_radius = 30
 
         # Create the buttons 
-        self.play_button = ctk.CTkButton(self.button_frame, text="▶", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius)
+        self.play_button = ctk.CTkButton(self.button_frame, text="▶", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius, command=self.start_live_graph)
 
-        self.pause_button = ctk.CTkButton(self.button_frame, text="⏸", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius)
+        self.pause_button = ctk.CTkButton(self.button_frame, text="⏸", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius, command=self.stop_live_graph)
 
         self.rewind_button = ctk.CTkButton(self.button_frame, text="↶", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius)
 
@@ -117,10 +122,10 @@ class live_counter_gui(ctk.CTk):
         # Create a matplotlib figure and axis
         plt.style.use("dark_background")
         self.fig, self.ax = plt.subplots(figsize=(5, 4))
-        self.line, = self.ax.plot([], [])
+        self.line, = self.ax.plot([], [], lw=2)
         self.ax.set_xlabel("Elapsed time (s)", labelpad=10)
         self.ax.set_ylabel("Count-related value", labelpad=20)
-        self.ax.grid(True)
+        self.ax.grid(True, color='gray', linewidth=0.5, alpha=0.7)
 
         # Create a FigureCanvasTkAgg object to embed the matplotlib figure in the Tkinter window
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.graph_frame)
@@ -157,7 +162,57 @@ class live_counter_gui(ctk.CTk):
         else:
             messagebox.showwarning("Connection Warning", "Moku IP is not set. Please enter a valid the IPv6 address.")
 
-    
+    def disconnect_from_moku(self):
+        if self.tfa:
+            try:
+                self.tfa.relinquish_ownership()
+                self.tfa = None
+                messagebox.showinfo("Disconnection Successful", "Successfully disconnected from Moku.")
+            except Exception as e:
+                messagebox.showerror("Disconnection Failed", f"Failed to disconnect from Moku. {e}.")
+        else:
+            messagebox.showwarning("Disconnection Warning", "Moku is not connected. Please connect to Moku first.")
+
+    def update_live_graph(self):
+
+        if not self.running_graph:
+            return  # If the graph is not running, exit the function
+
+        data = self.tfa.get_data()
+        stats = data['interval1']['statistics']
+        y = stats.get('count', 0)
+
+        self.times.append(time.time() - self.t_start)
+        self.values.append(y)
+
+        self.line.set_xdata(self.times)
+        self.line.set_ydata(self.values)
+
+        self.ax.relim()
+        self.ax.autoscale_view()
+
+        self.canvas.draw_idle()
+
+        # Schedule the next update
+        self.after(50, self.update_live_graph)
+        
+
+    def start_live_graph(self):
+        if not self.tfa:
+            messagebox.showwarning("Connection Warning", "Moku is not connected. Please connect to Moku first.")
+            return
+        if self.running_graph:
+            pass  # Already running, do nothing
+
+        self.running_graph = True
+        self.times = []
+        self.values = []
+        self.t_start = time.time()
+
+        self.update_live_graph()  # Start the update loop
+
+    def stop_live_graph(self):
+        self.running_graph = False  # Stop the update loop
 
 
 root = live_counter_gui()
