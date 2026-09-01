@@ -26,6 +26,7 @@ class live_counter_gui(ctk.CTk):
         self.input_channel = None
         self.continuous_time_trend = None
         self.tfa = None
+        self.running_graph = False
 
         # Create a frame for the configuration options on the left side of the window
         self.config_frame = ctk.CTkFrame(self, width=180)
@@ -40,6 +41,7 @@ class live_counter_gui(ctk.CTk):
         self.graph_frame = ctk.CTkFrame(self, width=420, height=545)
         self.graph_frame.grid(row=1, column=1, padx=10, pady=(10,10), sticky="nsew")
 
+        
         self.create_config_widgets()
         self.create_button_widgets()
         self.create_graph()
@@ -80,7 +82,7 @@ class live_counter_gui(ctk.CTk):
         self.input3_radio.grid(row=1, column=0, pady=5)
         self.input4_radio.grid(row=1, column=1, padx=(1,0), pady=5)
 
-        self.input1_radio.set(True)
+        self.input1_radio.set(True) # Set as default channel
 
         self.checkbox_time_trend = ctk.CTkCheckBox(self.config_frame,
                                                     text=f"Continuous \n Time Trend",
@@ -96,7 +98,7 @@ class live_counter_gui(ctk.CTk):
         button_radius = 30
 
         # Create the buttons 
-        self.play_button = ctk.CTkButton(self.button_frame, text="▶", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius, command=self.play)
+        self.play_button = ctk.CTkButton(self.button_frame, text="▶", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius)
 
         self.pause_button = ctk.CTkButton(self.button_frame, text="⏸", height=button_size, width=button_size, font=ctk.CTkFont(size=20, weight="bold"), corner_radius=button_radius)
 
@@ -113,8 +115,9 @@ class live_counter_gui(ctk.CTk):
 
     def create_graph(self):
         # Create a matplotlib figure and axis
-        plt.style.use('dark_background')
+        plt.style.use("dark_background")
         self.fig, self.ax = plt.subplots(figsize=(5, 4))
+        self.line, = self.ax.plot([], [])
         self.ax.set_xlabel("Elapsed time (s)", labelpad=10)
         self.ax.set_ylabel("Count-related value", labelpad=20)
         self.ax.grid(True)
@@ -133,15 +136,28 @@ class live_counter_gui(ctk.CTk):
 
         self.connect_to_moku()
 
+    def time_frequency_analyzer_config(self):
+
+        input_names = ["Input1", "Input2", "Input3", "Input4"]
+
+        self.tfa.set_event_detector(id=1, source=input_names[self.input_channel - 1], threshold=0, edge="Rising")
+        self.tfa.set_interpolation(mode="linear")
+        self.tfa.set_acquisition_mode(mode="Windowed", window_length=100e-3)
+        self.tfa.set_interval_policy(multiple_start_events="Use first", incomplete_intervals="Close")
+        self.tfa.set_interval_analyzer(id=1, start_event_id=1, stop_event_id=1)
+
     def connect_to_moku(self):
         if self.moku_ip:
             try:
-                self.tfa = TimeFrequencyAnalyzer(f"{self.moku_ip}", force_connect=True)
+                self.tfa = TimeFrequencyAnalyzer(f"[{self.moku_ip}]", force_connect=True)
+                self.time_frequency_analyzer_config()
                 messagebox.showinfo("Connection Successful", f"Successfully connected to Moku at {self.moku_ip}")
             except Exception as e:
                 messagebox.showerror("Connection Failed", f"Failed to connect to Moku at {self.moku_ip}. {e}. Please verify your connection.")
         else:
             messagebox.showwarning("Connection Warning", "Moku IP is not set. Please enter a valid the IPv6 address.")
+
+    
 
 
 root = live_counter_gui()
